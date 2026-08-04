@@ -4,6 +4,7 @@ import {
   DEFAULT_STATE, computeTotals, formatINR,
 } from "./pricing.config.js";
 import { saveLead, API_BASE } from "./config/api.js";
+import logoUrl from "./assets/rbd-logo.webp";
 
 const REDUCE_MOTION =
   typeof window !== "undefined" && window.matchMedia
@@ -241,7 +242,7 @@ export default function App() {
   <div className="wrap">
     <div className="brand">
       <span className="brand-logo">
-        <img src="/skyup-logo.png" alt="Skyup Digital Solutions" width="198" height="67" />
+        <img src={logoUrl} alt="Skyup Digital Solutions" width="160" height="46" />
       </span>
       <span className="brand-badge">CRM</span>
     </div>

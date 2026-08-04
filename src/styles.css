@@ -58,6 +58,12 @@ body::before {
 /* ---------- Header ---------- */
 .site-head { padding: clamp(14px, 3vw, 22px) 0; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.01em; }
+.brand-logo img { display: block; height: 46px; width: auto; }
+.brand-badge {
+  font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; color: var(--accent-2); background: #fff;
+  border: 1px solid var(--line-2); border-radius: 999px; padding: 3px 9px; line-height: 1;
+}
 .brand .logo {
   width: 34px; height: 34px; flex: 0 0 34px; border-radius: 9px;
   background: linear-gradient(135deg, var(--accent), var(--vivid));
@@ -213,7 +219,7 @@ body::before {
 .stepper button:disabled { color: #c2cade; cursor: not-allowed; }
 .stepper input {
   width: 54px; text-align: center; border: 0; outline: none;
-  font-family: "IBM Plex Mono", monospace; font-size: 15px; font-weight: 600; color: var(--ink);
+  font-family: "IBM Plex Mono", monospace; font-size: 16px; font-weight: 600; color: var(--ink);
   background: transparent; border-left: 1px solid var(--line); border-right: 1px solid var(--line);
   height: 40px; -moz-appearance: textfield; font-variant-numeric: tabular-nums;
 }
@@ -318,14 +324,21 @@ body::before {
 .mobile-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: rgba(255,255,255,.96);
   backdrop-filter: blur(8px); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(14,21,38,.1);
-  padding: 10px clamp(12px, 4vw, 20px); display: flex; align-items: center; gap: 12px;
+  padding: 10px clamp(12px, 4vw, 20px); padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 12px;
 }
 @media (min-width: 900px) { .mobile-bar { display: none; } }
 .mobile-bar .mb-price { line-height: 1.1; }
 .mobile-bar .mb-price b { font-family: "Space Grotesk", sans-serif; font-size: 20px; display: block; }
 .mobile-bar .mb-price span { font-size: 11px; color: var(--muted); }
 .mobile-bar .btn { width: auto; flex: 1; padding: 12px 14px; }
-@media (max-width: 899px){ .summary { position: static; } }
+@media (max-width: 899px){
+  .summary { position: static; }
+  /* on mobile the whole page scrolls, so don't trap scrolling inside a
+     fixed-height receipt box — let it grow naturally with its content */
+  .summary .receipt { max-height: none; overflow: visible; }
+  /* keep the footer clear of the fixed bottom price bar (+ iOS home indicator) */
+  .site-foot { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
 
 /* keep the sticky card's header + Book-a-demo reachable even when the card is
    taller than the viewport: cap the card to the viewport height and let only
@@ -370,7 +383,7 @@ body::before {
 .modal p.m-sub { color: var(--muted); font-size: 13.5px; margin: 0 0 16px; }
 .field { margin-bottom: 12px; }
 .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
-.field input, .field textarea { width: 100%; border: 1px solid var(--line-2); border-radius: 10px; padding: 11px 12px; font-size: 15px; font-family: inherit; color: var(--ink); background: #fff; }
+.field input, .field textarea { width: 100%; border: 1px solid var(--line-2); border-radius: 10px; padding: 11px 12px; font-size: 16px; font-family: inherit; color: var(--ink); background: #fff; }
 .field input:focus, .field textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
 .modal .quote { background: var(--accent-soft); border: 1px solid #d8e0ff; border-radius: 10px; padding: 12px; font-size: 13px; margin-bottom: 14px; }
 .modal .quote b { font-family: "IBM Plex Mono", monospace; }
@@ -383,6 +396,8 @@ body::before {
 .site-foot a { color: var(--accent-2); text-decoration: none; }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* clean tap feedback on touch devices (no default grey flash) */
+.btn, .stepper button, .mod, .hero-live, .modal-close { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
   .flow-dot.done { transform: none; }
