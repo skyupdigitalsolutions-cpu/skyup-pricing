@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
-  BASE_PLATFORM, INCLUDED_SEATS, QUANTITIES, LEADS, MODULES, CALL_METER, CONTACT,
+  BASE_PLATFORM, INCLUDED_SEATS, INCLUDED_FEATURES, QUANTITIES, LEADS, MODULES, CALL_METER, CONTACT,
   DEFAULT_STATE, computeTotals, formatINR,
 } from "./pricing.config.js";
 
@@ -24,7 +24,7 @@ function useAnimatedNumber(value, duration = 500) {
     cancelAnimationFrame(rafRef.current);
     function tick(now) {
       const t = Math.min(1, (now - start) / duration);
-      setDisplay(Math.round(from + (value - from) * ease(t)));
+      setDisplay(t < 1 ? Math.round(from + (value - from) * ease(t)) : value);
       if (t < 1) rafRef.current = requestAnimationFrame(tick);
       else fromRef.current = value;
     }
@@ -219,6 +219,9 @@ export default function App() {
                 <div className="included">
                   {INCLUDED_SEATS.map((s) => (
                     <span className="chip" key={s.label}><b>{s.count}</b> {s.label} <span className="free">free</span></span>
+                  ))}
+                  {INCLUDED_FEATURES.map((f) => (
+                    <span className="chip" key={f.label}><b>{f.count}</b> {f.label} <span className="free">free</span></span>
                   ))}
                 </div>
               </section>

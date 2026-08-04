@@ -24,7 +24,7 @@ export const CONTACT = {
 export const BASE_PLATFORM = {
   id: "base",
   label: "Core CRM platform",
-  price: 1499,
+  price: 2999,
   note: "Lead management, live dashboard, real-time notifications, secure login & role-based access.",
 };
 
@@ -33,6 +33,15 @@ export const INCLUDED_SEATS = [
   { label: "Users", count: 3 },
   { label: "Admin", count: 1 },
   { label: "Super admin", count: 1 },
+];
+
+// Extra base inclusions shown as chips in the "Start with the core" section,
+// so customers can see everything the base plan already covers (all free).
+export const INCLUDED_FEATURES = [
+  { label: "Website + analytics report", count: 1 },
+  { label: "Meta campaign + analytics report", count: 1 },
+  { label: "Google campaign + analytics report", count: 1 },
+  { label: "leads storage", count: "5,000" },
 ];
 
 // Stepper quantities. amount = pricePer * max(0, qty - included)
@@ -127,7 +136,7 @@ export function priceLines(state) {
 export function computeTotals(state) {
   const lines = priceLines(state);
   const subtotal = lines.reduce((s, l) => s + l.amount, 0);
-  const gst = Math.round(subtotal * GST_RATE);
+  const gst = Math.round(subtotal * GST_RATE * 100) / 100; // keep paise (e.g. 539.82), not whole-rupee rounded
   const total = subtotal + gst;
   const displayTotal = Math.max(total, MIN_MONTHLY_TOTAL);
   const minApplied = displayTotal > total;
@@ -135,5 +144,7 @@ export function computeTotals(state) {
 }
 
 export function formatINR(n) {
-  return CURRENCY + Number(Math.round(n)).toLocaleString("en-IN");
+  // Show up to 2 decimals so GST / total like ₹539.82 render correctly,
+  // while whole amounts (₹2,999) stay clean with no trailing ".00".
+  return CURRENCY + (Number(n) || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 }
