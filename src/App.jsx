@@ -75,7 +75,7 @@ function Stepper({ value, min, max, step = 1, onChange }) {
 
 /* ---------- book-a-demo modal ---------- */
 function DemoModal({ totals, state, onClose }) {
-  const [form, setForm] = useState({ name: "", phone: "", email: "", company_website: "" });
+  const [form, setForm] = useState({ name: "", phone: "", email: "" });
   const [status, setStatus] = useState("idle"); // idle | saving | saved | error
   const [err, setErr] = useState("");
   const savedRef = useRef(false); // save at most once per modal open
@@ -101,7 +101,6 @@ function DemoModal({ totals, state, onClose }) {
     name: form.name,
     phone: form.phone,
     email: form.email,
-    company_website: form.company_website, // honeypot — real users leave this blank
     pricing: {
       currency: "INR",
       lines: totals.lines.map((l) => ({ id: l.id, label: l.label, kind: l.kind, qty: l.qty, amount: l.amount })),
@@ -163,13 +162,6 @@ function DemoModal({ totals, state, onClose }) {
         <div className="field"><label htmlFor="d-name">Name</label><input id="d-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" /></div>
         <div className="field"><label htmlFor="d-phone">Phone / WhatsApp</label><input id="d-phone" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="10-digit number" /></div>
         <div className="field"><label htmlFor="d-email">Email</label><input id="d-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@company.com" /></div>
-
-        {/* honeypot: hidden from users, catches bots */}
-        <input
-          type="text" name="company_website" tabIndex={-1} autoComplete="off" aria-hidden="true"
-          value={form.company_website} onChange={(e) => setForm({ ...form, company_website: e.target.value })}
-          style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
-        />
 
         <button className="btn btn-primary" onClick={() => persist({ block: true })} disabled={status === "saving" || saved}>
           {status === "saving" ? "Sending…" : saved ? "Request sent ✓" : "Submit request"}
