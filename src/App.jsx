@@ -3,6 +3,7 @@ import {
   BASE_PLATFORM, INCLUDED_SEATS, INCLUDED_FEATURES, QUANTITIES, LEADS, MODULES, CALL_METER, CONTACT,
   DEFAULT_STATE, computeTotals, formatINR,
 } from "./pricing.config.js";
+import { saveLead, API_BASE } from "./config/api.js";
 
 const REDUCE_MOTION =
   typeof window !== "undefined" && window.matchMedia
@@ -73,8 +74,12 @@ function Stepper({ value, min, max, step = 1, onChange }) {
 }
 
 /* ---------- book-a-demo modal ---------- */
-function DemoModal({ totals, onClose }) {
-  const [form, setForm] = useState({ name: "", phone: "", email: "" });
+function DemoModal({ totals, state, onClose }) {
+  const [form, setForm] = useState({ name: "", phone: "", email: "", company_website: "" });
+  const [status, setStatus] = useState("idle"); // idle | saving | saved | error
+  const [err, setErr] = useState("");
+  const savedRef = useRef(false); // save at most once per modal open
+
   const summaryText = useMemo(() => {
     const parts = [`Hi ${CONTACT.brand}, I'd like a demo of Skyup CRM with this setup:`];
     for (const l of totals.lines) {
@@ -92,6 +97,59 @@ function DemoModal({ totals, onClose }) {
   const waLink = `https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(summaryText)}`;
   const mailLink = `mailto:${CONTACT.email}?subject=${encodeURIComponent("Skyup CRM demo request")}&body=${encodeURIComponent(summaryText)}`;
 
+  const buildPayload = () => ({
+    name: form.name,
+    phone: form.phone,
+    email: form.email,
+    company_website: form.company_website, // honeypot — real users leave this blank
+    pricing: {
+      currency: "INR",
+      lines: totals.lines.map((l) => ({ id: l.id, label: l.label, kind: l.kind, qty: l.qty, amount: l.amount })),
+      subtotal: totals.subtotal,
+      gst: totals.gst,
+      total: totals.total,
+      displayTotal: totals.displayTotal,
+      minApplied: totals.minApplied,
+    },
+    config: {
+      users: state?.users, admins: state?.admins, websites: state?.websites,
+      metaCampaigns: state?.metaCampaigns, googleCampaigns: state?.googleCampaigns,
+      leads: state?.leads, callBlocks: state?.callBlocks, modules: state?.modules || {},
+    },
+    referrer: typeof document !== "undefined" ? document.referrer : "",
+    source: "pricing-site",
+  });
+
+  // Persist the lead. `block` = user pressed the primary button (validate + show errors);
+  // otherwise it's a background save triggered by the WhatsApp/email links.
+  const persist = async ({ block = false } = {}) => {
+    if (savedRef.current) return true;
+
+    const hasContact = form.phone.trim() || form.email.trim();
+    if (block) {
+      if (!form.name.trim()) { setErr("Please add your name."); return false; }
+      if (!hasContact) { setErr("Add a phone number or email."); return false; }
+    } else if (!form.name.trim() || !hasContact) {
+      return false; // don't fire junk background saves
+    }
+
+    if (!API_BASE) { if (block) setErr("Lead saving isn't configured yet (set VITE_API_URL)."); return false; }
+
+    setErr(""); setStatus("saving");
+    try {
+      await saveLead(buildPayload());
+      savedRef.current = true;
+      setStatus("saved");
+      return true;
+    } catch (e) {
+      setStatus("error");
+      if (block) setErr("Couldn't save right now — please reach us on WhatsApp/email below.");
+      return false;
+    }
+  };
+
+  const saved = status === "saved";
+
   return (
     <div className="modal-back" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -103,10 +161,24 @@ function DemoModal({ totals, onClose }) {
           {totals.minApplied && <div className="quote-note">Minimum monthly plan</div>}
         </div>
         <div className="field"><label htmlFor="d-name">Name</label><input id="d-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" /></div>
-        <div className="field"><label htmlFor="d-phone">Phone / WhatsApp</label><input id="d-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="10-digit number" /></div>
+        <div className="field"><label htmlFor="d-phone">Phone / WhatsApp</label><input id="d-phone" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="10-digit number" /></div>
         <div className="field"><label htmlFor="d-email">Email</label><input id="d-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@company.com" /></div>
-        <a className="btn wa" href={waLink} target="_blank" rel="noreferrer">Send on WhatsApp</a>
-        <a className="btn btn-ghost" href={mailLink}>Send by email</a>
+
+        {/* honeypot: hidden from users, catches bots */}
+        <input
+          type="text" name="company_website" tabIndex={-1} autoComplete="off" aria-hidden="true"
+          value={form.company_website} onChange={(e) => setForm({ ...form, company_website: e.target.value })}
+          style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
+        />
+
+        <button className="btn btn-primary" onClick={() => persist({ block: true })} disabled={status === "saving" || saved}>
+          {status === "saving" ? "Sending…" : saved ? "Request sent ✓" : "Submit request"}
+        </button>
+        <a className="btn wa" href={waLink} target="_blank" rel="noreferrer" onClick={() => { persist(); }}>Send on WhatsApp</a>
+        <a className="btn btn-ghost" href={mailLink} onClick={() => { persist(); }}>Send by email</a>
+
+        {saved && <p className="s-note" style={{ color: "var(--good)" }}>Thanks! We've got your request and will reach out shortly.</p>}
+        {err && <p className="s-note" style={{ color: "var(--amber)" }}>{err}</p>}
       </div>
     </div>
   );
@@ -360,7 +432,7 @@ export default function App() {
         </div>
       </div>
 
-      {showDemo && <DemoModal totals={totals} onClose={() => setShowDemo(false)} />}
+      {showDemo && <DemoModal totals={totals} state={state} onClose={() => setShowDemo(false)} />}
     </>
   );
 }
