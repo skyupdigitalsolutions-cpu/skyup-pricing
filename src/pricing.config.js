@@ -13,8 +13,12 @@ export const MIN_MONTHLY_TOTAL = 3349;
 
 // Billing-period toggle shown above the price. "months" is the commitment length;
 // "discountPct" is the % knocked off the plain months-multiplied price for
-// committing upfront.
+// committing upfront. "basePrice" overrides the core-platform fee used to
+// compute this period's total — Monthly carries a no-commitment premium;
+// 6-Month/Yearly omit it and fall back to BASE_PLATFORM.price (the cheaper,
+// commit-and-save rate baked into their bundle discount).
 export const BILLING_PERIODS = [
+  { id: "monthly",   label: "Monthly",  unit: "month",    months: 1,  discountPct: 0,  basePrice: 3499 },
   { id: "sixmonth",  label: "6 Months", unit: "6 months",  months: 6,  discountPct: 10 },
   { id: "yearly",    label: "Yearly",   unit: "year",     months: 12, discountPct: 20 },
 ];
@@ -135,9 +139,12 @@ export const DEFAULT_STATE = {
 };
 
 // -------- Pure pricing engine (shared logic) --------
-export function priceLines(state) {
+// basePrice lets a billing period (see BILLING_PERIODS) charge a different
+// core-platform fee — e.g. a no-commitment Monthly premium — without touching
+// any of the per-unit add-on pricing below.
+export function priceLines(state, basePrice = BASE_PLATFORM.price) {
   const lines = [];
-  lines.push({ id: "base", label: BASE_PLATFORM.label, qty: 1, amount: BASE_PLATFORM.price, kind: "base" });
+  lines.push({ id: "base", label: BASE_PLATFORM.label, qty: 1, amount: basePrice, kind: "base" });
 
   for (const q of QUANTITIES) {
     const count = Math.max(q.min, Number(state[q.id]) || q.min);
@@ -166,8 +173,8 @@ export function priceLines(state) {
   return lines;
 }
 
-export function computeTotals(state) {
-  const lines = priceLines(state);
+export function computeTotals(state, basePrice = BASE_PLATFORM.price) {
+  const lines = priceLines(state, basePrice);
   const subtotal = lines.reduce((s, l) => s + l.amount, 0);
   const total = subtotal; // listed prices already include GST — nothing added on top
   const displayTotal = Math.max(total, MIN_MONTHLY_TOTAL);

@@ -1,14 +1,28 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, useId } from "react";
+import { createPortal } from "react-dom";
 import {
   BASE_PLATFORM, INCLUDED_SEATS, INCLUDED_FEATURES, QUANTITIES, LEADS, MODULES, CALL_METER, CONTACT,
   DEFAULT_STATE, BILLING_PERIODS, computeTotals, computeBilling, formatINR,
 } from "./pricing.config.js";
 import { saveLead, API_BASE } from "./config/api.js";
 import logoUrl from "./assets/rbd-logo.webp";
+import {
+  Check, X, Plus, Minus, Info, ArrowRight, Sparkles, LayoutGrid, Users, Megaphone,
+  Database, Zap, BadgePercent, TrendingUp, TrendingDown, MessageCircle, Send, Filter, Bell, Link2,
+  Globe, ShieldCheck,
+} from "lucide-react";
+import { SiMeta, SiGoogleads } from "react-icons/si";
 
 const REDUCE_MOTION =
   typeof window !== "undefined" && window.matchMedia
     ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
+
+// true on mice/trackpads (laptop, desktop) — false on touchscreens, where
+// there's no real "hover" and tapping has to be the only way to open a tip
+const SUPPORTS_HOVER =
+  typeof window !== "undefined" && window.matchMedia
+    ? window.matchMedia("(hover: hover) and (pointer: fine)").matches
     : false;
 
 const DEMO_SUBMITTED_KEY = "skyup_demo_submitted";
@@ -39,24 +53,32 @@ function useAnimatedNumber(value, duration = 500) {
   return display;
 }
 
-/* fires a short-lived +/- delta and a "bump" tick whenever value changes */
-function useValueBump(value) {
+/* fires a short-lived +/- delta and a "bump" tick when `trigger` changes
+   (e.g. a period-independent monthly total) — the +/- magnitude shown is the
+   change in `display` (e.g. the rounded, period-scaled headline price) —
+   so switching billing periods never itself pops a delta chip, but a real
+   builder change still reports the exact jump in whatever period is showing */
+function useTrackedDelta(trigger, display) {
   const [delta, setDelta] = useState(0);
   const [bump, setBump] = useState(0);
-  const prevRef = useRef(value);
+  const prevTriggerRef = useRef(trigger);
+  const prevDisplayRef = useRef(display);
   const timeoutRef = useRef(null);
 
   useEffect(() => {
-    const diff = value - prevRef.current;
-    if (diff !== 0) {
-      prevRef.current = value;
-      setDelta(diff);
-      setBump((b) => b + 1);
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setDelta(0), 1500);
+    if (trigger !== prevTriggerRef.current) {
+      const diff = display - prevDisplayRef.current;
+      prevTriggerRef.current = trigger;
+      if (diff !== 0) {
+        setDelta(diff);
+        setBump((b) => b + 1);
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => setDelta(0), 1500);
+      }
     }
+    prevDisplayRef.current = display;
     return () => clearTimeout(timeoutRef.current);
-  }, [value]);
+  }, [trigger, display]);
 
   return { delta, bump };
 }
@@ -85,55 +107,112 @@ function Stepper({ value, min, max, step = 1, onChange }) {
   const set = (v) => onChange(Math.max(min, Math.min(max, v)));
   return (
     <div className="stepper" role="group" aria-label="quantity">
-      <button type="button" aria-label="decrease" disabled={value <= min} onClick={() => set(value - step)}>−</button>
+      <button type="button" aria-label="decrease" disabled={value <= min} onClick={() => set(value - step)}><Minus size={16} /></button>
       <input
         type="number" inputMode="numeric" value={value} min={min} max={max}
         onChange={(e) => { const n = parseInt(e.target.value, 10); set(Number.isNaN(n) ? min : n); }}
       />
-      <button type="button" aria-label="increase" disabled={value >= max} onClick={() => set(value + step)}>+</button>
+      <button type="button" aria-label="increase" disabled={value >= max} onClick={() => set(value + step)}><Plus size={16} /></button>
     </div>
   );
 }
 
-/* ---------- click-to-reveal plain-English explanation ---------- */
+/* only one InfoTip may be open at a time — clicking one closes any other
+   that's already open, so their popups can never stack/overlap each other */
+let activeInfoTipId = null;
+const infoTipListeners = new Set();
+function setActiveInfoTip(id) {
+  activeInfoTipId = id;
+  infoTipListeners.forEach((fn) => fn(id));
+}
+
+/* ---------- hover (mouse) / tap (touch) reveal for plain-English explanations ---------- */
 function InfoTip({ text }) {
+  const id = useId();
   const [open, setOpen] = useState(false);
   const [shift, setShift] = useState(0);
+  const [pos, setPos] = useState(null);
   const ref = useRef(null);
+  const btnRef = useRef(null);
   const popRef = useRef(null);
+  const closeTimerRef = useRef(null);
+
+  useEffect(() => {
+    const listener = (activeId) => setOpen(activeId === id);
+    infoTipListeners.add(listener);
+    return () => infoTipListeners.delete(listener);
+  }, [id]);
+
+  useEffect(() => () => clearTimeout(closeTimerRef.current), []);
+
+  // on mouse/trackpad devices, hovering opens it immediately; the singleton
+  // above still guarantees only one is ever open, so hovering across several
+  // tightly-packed chips just hands "active" from one to the next — never two at once
+  const openOnHover = () => { clearTimeout(closeTimerRef.current); setShift(0); setActiveInfoTip(id); };
+  const closeOnHoverOut = () => {
+    clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => { if (activeInfoTipId === id) setActiveInfoTip(null); }, 150);
+  };
 
   useEffect(() => {
     if (!open) return;
-    const onDocClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onDocClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setActiveInfoTip(null); };
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open]);
 
-  // keep the popover inside the viewport instead of letting it run off-screen
-  // (and get visually clipped/overlapped) when the trigger sits near an edge
+  // the popup is portaled to <body> (see below) so it can never end up behind a
+  // later section — but that means it's no longer positioned relative to its
+  // trigger by CSS alone; measure the trigger's on-screen position ourselves
   useEffect(() => {
-    if (!open || !popRef.current) return;
+    if (!open || !btnRef.current) { setPos(null); return; }
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 8, left: r.left + r.width / 2 });
+    // a fixed-position popup would visually detach from its trigger on scroll — closing
+    // is simpler and more predictable than continuously re-measuring while open.
+    // Delay attaching by a beat so residual momentum from the scroll that just brought
+    // the trigger into view (e.g. scrollIntoView) doesn't immediately close it again.
+    const onScroll = () => setActiveInfoTip(null);
+    const attachTimer = setTimeout(() => {
+      window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    }, 250);
+    return () => {
+      clearTimeout(attachTimer);
+      window.removeEventListener("scroll", onScroll, { capture: true });
+    };
+  }, [open]);
+
+  // keep the popover inside the viewport instead of letting it run off-screen
+  // (and get visually clipped) when the trigger sits near an edge
+  useEffect(() => {
+    if (!open || !pos || !popRef.current) return;
     const rect = popRef.current.getBoundingClientRect();
     const margin = 10;
     let delta = 0;
     if (rect.left < margin) delta = margin - rect.left;
     else if (rect.right > window.innerWidth - margin) delta = (window.innerWidth - margin) - rect.right;
     setShift(delta);
-  }, [open]);
+  }, [open, pos]);
 
   if (!text) return null;
   return (
-    <span className="infotip" ref={ref}>
+    <span
+      className="infotip" ref={ref}
+      onMouseEnter={SUPPORTS_HOVER ? openOnHover : undefined}
+      onMouseLeave={SUPPORTS_HOVER ? closeOnHoverOut : undefined}
+    >
       <button
+        ref={btnRef}
         type="button" className="info-btn" aria-label="What does this mean?" aria-expanded={open}
-        onClick={(e) => { e.stopPropagation(); setShift(0); setOpen((o) => !o); }}
-      >i</button>
-      {open && (
+        onClick={(e) => { e.stopPropagation(); setShift(0); setActiveInfoTip(open ? null : id); }}
+      ><Info size={10} strokeWidth={2.5} /></button>
+      {open && pos && createPortal(
         <span
           className="info-pop" ref={popRef} role="note"
-          style={{ "--pop-shift": `${shift}px` }}
+          style={{ position: "fixed", top: pos.top, left: pos.left, "--pop-shift": `${shift}px` }}
           onClick={(e) => e.stopPropagation()}
-        >{text}</span>
+        >{text}</span>,
+        document.body
       )}
     </span>
   );
@@ -217,7 +296,7 @@ function DemoModal({ totals, state, onClose, onSubmitted }) {
   return (
     <div className="modal-back" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" aria-label="Close" onClick={onClose}>×</button>
+        <button className="modal-close" aria-label="Close" onClick={onClose}><X size={20} /></button>
         <h3>Book a free demo</h3>
         <p className="m-sub">Leave your details and we'll walk you through this exact setup. No payment now.</p>
         <div className="quote">
@@ -229,15 +308,30 @@ function DemoModal({ totals, state, onClose, onSubmitted }) {
         <div className="field"><label htmlFor="d-email">Email</label><input id="d-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@company.com" /></div>
 
         <button className="btn btn-primary" onClick={() => persist({ block: true })} disabled={status === "saving" || saved}>
-          {status === "saving" ? "Sending…" : saved ? "Request sent ✓" : "Submit request"}
+          {status === "saving" ? "Sending…" : saved ? <><Check size={16} /> Request sent</> : <><Send size={16} /> Submit request</>}
         </button>
-        <a className="btn wa" href={waLink} target="_blank" rel="noreferrer" onClick={() => { persist(); }}>Send on WhatsApp</a>
+        <a className="btn wa" href={waLink} target="_blank" rel="noreferrer" onClick={() => { persist(); }}><MessageCircle size={18} /> Send on WhatsApp</a>
 
         {saved && <p className="s-note" style={{ color: "var(--good)" }}>Thanks! We've got your request and will reach out shortly.</p>}
         {err && <p className="s-note" style={{ color: "var(--amber)" }}>{err}</p>}
       </div>
     </div>
   );
+}
+
+/* ---------- brand/context icon shown next to a quantity row's label ---------- */
+const QTY_ICONS = {
+  users: { Icon: Users, color: "var(--accent)" },
+  admins: { Icon: ShieldCheck, color: "var(--accent)" },
+  websites: { Icon: Globe, color: "var(--accent)" },
+  metaCampaigns: { Icon: SiMeta, color: "#0866FF" },
+  googleCampaigns: { Icon: SiGoogleads, color: "#4285F4" },
+};
+function QtyIcon({ id }) {
+  const cfg = QTY_ICONS[id];
+  if (!cfg) return null;
+  const { Icon, color } = cfg;
+  return <Icon size={16} className="q-icon" style={{ color }} aria-hidden="true" />;
 }
 
 /* ---------- a quantity row ---------- */
@@ -247,7 +341,7 @@ function QtyRow({ q, count, onChange }) {
   return (
     <div className="qty">
       <div>
-        <div className="q-label">{q.label}<InfoTip text={q.info} /></div>
+        <div className="q-label"><QtyIcon id={q.id} />{q.label}<InfoTip text={q.info} /></div>
         <div className="q-help">{q.help}</div>
       </div>
       <Stepper value={count} min={q.min} max={q.max} onChange={onChange} />
@@ -260,14 +354,11 @@ function QtyRow({ q, count, onChange }) {
   );
 }
 
-/* ---------- a numbered rail node wrapping a panel ---------- */
-function FlowRow({ n, done, variant = "up", children }) {
+/* ---------- scroll-revealed row wrapping a panel ---------- */
+function FlowRow({ variant = "up", children }) {
   const [ref, inView] = useReveal();
   return (
-    <div ref={ref} className={`flow-row reveal reveal-${variant}` + (done ? " section-done" : "") + (inView ? " in-view" : "")}>
-      <div className="flow-node">
-        <span className={"flow-dot" + (done ? " done" : "")}>{done ? "✓" : n}</span>
-      </div>
+    <div ref={ref} className={`flow-row reveal reveal-${variant}` + (inView ? " in-view" : "")}>
       {children}
     </div>
   );
@@ -286,21 +377,10 @@ function Reveal({ variant = "up", className = "", delay = 0, children }) {
 
 /* ---------- small line-icon used on marketing feature cards ---------- */
 function FeatIcon({ name }) {
-  const glyph = {
-    pipeline: <path d="M4 5h16l-6.2 7.4V18l-3.6 2v-7.6L4 5z" />,
-    bell: <path d="M12 3a5.5 5.5 0 0 0-5.5 5.5v2.7c0 .7-.3 1.4-.8 1.9L4 15h16l-1.7-1.9c-.5-.5-.8-1.2-.8-1.9V8.5A5.5 5.5 0 0 0 12 3zm-2.4 15a2.4 2.4 0 0 0 4.8 0h-4.8z" />,
-    link: (
-      <path
-        d="M8.5 15.5l7-7M9.8 6.8l.9-.9a3 3 0 1 1 4.2 4.2l-.9.9M14.2 17.2l-.9.9a3 3 0 1 1-4.2-4.2l.9-.9"
-        stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"
-      />
-    ),
-    team: <path d="M8.5 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 19c0-3.3 2.6-5.5 5.5-5.5S14 15.7 14 19H3zM16.8 11.5a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6zM21 18.5c0-2.5-1.8-4.4-4.2-4.7.6.9 1 2 1 3.2v1.5h3.2z" />,
-    spark: <path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6-5.6-1.9 5.6-1.9L12 2.5z" />,
-  }[name];
+  const Icon = { pipeline: Filter, bell: Bell, link: Link2, team: Users, spark: Sparkles }[name];
   return (
     <span className="feat-icon">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">{glyph}</svg>
+      <Icon size={20} strokeWidth={2.2} aria-hidden="true" />
     </span>
   );
 }
@@ -333,7 +413,11 @@ const FEATURES = [
 export default function App() {
   const [state, setState] = useState({ ...DEFAULT_STATE, modules: { ...DEFAULT_STATE.modules } });
   const [showDemo, setShowDemo] = useState(false);
-  const totals = useMemo(() => computeTotals(state), [state]);
+  const [period, setPeriod] = useState(BILLING_PERIODS[1]); // default: 6-month
+  const totals = useMemo(() => computeTotals(state, period.basePrice), [state, period]);
+  // tracked at the default base price so switching periods never itself looks
+  // like a builder-driven price change to useValueBump below
+  const deltaTotals = useMemo(() => computeTotals(state), [state]);
 
   const demoSubmittedRef = useRef(
     typeof window !== "undefined" && window.localStorage
@@ -377,16 +461,11 @@ export default function App() {
   const callMins = (state.callBlocks || 0) * CALL_METER.blockMinutes;
   const callAmt = (state.callBlocks || 0) * CALL_METER.blockPrice;
 
-  const teamDone = state.users > 3 || state.admins > 1;
-  const channelsDone = state.websites > 1 || state.metaCampaigns > 1 || state.googleCampaigns > 1;
   const leadsDone = Number(state.leads) !== LEADS.default;
-  const addonsDone = Object.values(state.modules).some(Boolean) || (state.callBlocks || 0) > 0;
 
-  const [period, setPeriod] = useState(BILLING_PERIODS[0]); // default: 6-month
   const billing = useMemo(() => computeBilling(totals.displayTotal, period), [totals.displayTotal, period]);
   const displayPrice = useAnimatedNumber(billing.discounted);
-  const { delta, bump } = useValueBump(totals.displayTotal);
-  const deltaForPeriod = delta * period.months * (1 - period.discountPct / 100);
+  const { delta: deltaForPeriod, bump } = useTrackedDelta(deltaTotals.displayTotal, billing.discounted);
 
   const [summaryRef, summaryInView] = useReveal();
   const [footRef, footInView] = useReveal();
@@ -412,12 +491,12 @@ export default function App() {
       <section className="hero">
         <div className="wrap hero-grid">
           <div>
-            <span className="eyebrow">◆ AI-Powered CRM</span>
+            <span className="eyebrow"><Sparkles size={12} /> AI-Powered CRM</span>
             <h1>AI-Powered CRM That Helps You <span className="hl">Follow Up Smarter</span> and Close More Sales</h1>
             <p className="lede">Capture every enquiry, manage your sales team and receive AI-generated summaries and follow-up suggestions — all from one CRM.</p>
             <p className="lede">Connect leads from Meta Ads, Google Ads, websites and other sources without managing multiple applications.</p>
             <div className="hero-ctas">
-              <button type="button" className="btn btn-primary btn-cta btn-standout" onClick={scrollToBuilder}><span>Customise My CRM & See the Price</span><span className="btn-arrow">→</span></button>
+              <button type="button" className="btn btn-primary btn-cta btn-standout" onClick={scrollToBuilder}><span>Customise My CRM & See the Price</span><span className="btn-arrow"><ArrowRight size={16} /></span></button>
               <button type="button" className="btn btn-ghost" onClick={() => setShowDemo(true)}>Book a Free Demo</button>
             </div>
             <p className="hero-note">Plans are recommended based on your users, lead volume, integrations and business requirements.</p>
@@ -432,10 +511,10 @@ export default function App() {
             <p className="sec-sub">Managing enquiries through Excel, personal WhatsApp accounts and multiple applications can result in:</p>
             <ul className="pain-list">
               {PAIN_POINTS.map((p, i) => (
-                <li key={p} style={{ transitionDelay: `${i * 60}ms` }}><span className="pain-x">✕</span>{p}</li>
+                <li key={p} style={{ transitionDelay: `${i * 60}ms` }}><span className="pain-x"><X size={11} strokeWidth={3} /></span>{p}</li>
               ))}
             </ul>
-            <p className="pain-solution"><span className="tick-sm">✓</span>Our CRM keeps your leads, conversations, follow-ups and team activity in one organised system.</p>
+            <p className="pain-solution"><span className="tick-sm"><Check size={12} strokeWidth={3} /></span>Our CRM keeps your leads, conversations, follow-ups and team activity in one organised system.</p>
           </Reveal>
         </div>
       </section>
@@ -443,7 +522,7 @@ export default function App() {
       <section className="features">
         <div className="wrap">
           <Reveal variant="up" className="features-head">
-            <span className="eyebrow">◆ What's inside</span>
+            <span className="eyebrow"><Sparkles size={12} /> What's inside</span>
             <h2 className="sec-h2">Everything You Need to Manage and Convert Leads</h2>
           </Reveal>
           <div className="feat-grid">
@@ -461,7 +540,7 @@ export default function App() {
             ))}
           </div>
           <Reveal variant="up" className="section-cta">
-            <button type="button" className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}><span>See the CRM in Action</span><span className="btn-arrow">→</span></button>
+            <button type="button" className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}><span>See the CRM in Action</span><span className="btn-arrow"><ArrowRight size={16} /></span></button>
           </Reveal>
         </div>
       </section>
@@ -472,7 +551,7 @@ export default function App() {
             <h2 className="sec-h2">Manage Leads Better. Follow Up Faster. Sell Smarter.</h2>
             <p>Bring your enquiries, advertising data, sales activities and AI-powered insights into one CRM.</p>
             <div className="cta-banner-actions">
-              <button type="button" className="btn btn-primary btn-cta btn-standout" onClick={scrollToBuilder}><span>Customise My CRM & See the Price</span><span className="btn-arrow">→</span></button>
+              <button type="button" className="btn btn-primary btn-cta btn-standout" onClick={scrollToBuilder}><span>Customise My CRM & See the Price</span><span className="btn-arrow"><ArrowRight size={16} /></span></button>
               <button type="button" className="btn btn-ghost-dark" onClick={() => setShowDemo(true)}>Book a Free CRM Demo</button>
             </div>
             <p className="cta-tag">For businesses across Bengaluru.</p>
@@ -482,13 +561,76 @@ export default function App() {
 
       <main className="wrap" ref={builderRef}>
         <div className="builder">
+          {/* live summary — placed first in the DOM (not just visually) so position: sticky
+              has the whole tall .builder as its containing block and can stay pinned to the
+              top of the screen while the config panels below it scroll; desktop restores the
+              config-left/summary-right look via explicit grid-column placement in CSS. */}
+          <aside
+            ref={summaryRef} id="summary-card"
+            className={"summary reveal reveal-right" + (summaryInView ? " in-view" : "")}
+          >
+            <div className="s-top">
+              <div className="period-toggle" role="tablist" aria-label="Billing period">
+                {BILLING_PERIODS.map((p) => (
+                  <button
+                    key={p.id} type="button" role="tab" aria-selected={period.id === p.id}
+                    className={"period-btn" + (period.id === p.id ? " active" : "")}
+                    onClick={() => setPeriod(p)}
+                  >{p.label}</button>
+                ))}
+              </div>
+              <div className="s-eye">Your {period.label} price</div>
+              <div className="s-price-wrap">
+                {billing.hasDiscount && (
+                  <div className="s-price-meta">
+                    <span className="s-price-strike mono">{formatINR(billing.original)}</span>
+                    <span className="s-discount-badge"><BadgePercent size={13} /> {billing.discountPct}% OFF</span>
+                  </div>
+                )}
+                <div className="s-price mono" key={`${bump}-${period.id}`}>
+                  {formatINR(displayPrice)}<span className="per">/ {period.unit}</span>
+                  {deltaForPeriod !== 0 && (
+                    <span className="delta-chip">
+                      {deltaForPeriod > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                      {formatINR(Math.abs(deltaForPeriod))}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="s-sub">Incl. GST · cancel anytime</div>
+              <div className="s-permo">{formatINR(totals.displayTotal)} / month</div>
+            </div>
+            <div className="receipt">
+              {totals.lines.map((l) => (
+                <div className="r-line" key={l.id}>
+                  <span className="r-lab">{l.label}{l.kind === "qty" ? ` ×${l.qty}` : ""}</span>
+                  <span className="r-amt">{formatINR(l.amount)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="totals">
+              <div className="t-line grand">
+                <span>Total / {period.unit} (incl. GST)</span>
+                <span className="mono">
+                  {billing.hasDiscount && <s className="t-strike">{formatINR(billing.original)}</s>}
+                  {formatINR(billing.discounted)}
+                </span>
+              </div>
+              {totals.minApplied && <div className="floor-note"><Info size={12} /> Minimum monthly plan</div>}
+            </div>
+            <div className="s-actions">
+              <button className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}><span>Book a free demo</span><span className="btn-arrow"><ArrowRight size={16} /></span></button>
+              <p className="s-note">No card required. We'll set up this exact configuration for you.</p>
+            </div>
+          </aside>
+
           <div className="col-config flow">
             {/* 01 core */}
-            <FlowRow n="01" done variant="up">
+            <FlowRow variant="up">
               <section className="panel">
-                <div className="section-head"><h2>Start with the core</h2><span className="sub">Included in every build — this is your foundation.</span></div>
+                <div className="section-head"><h2><LayoutGrid size={18} /> Start with the core</h2><span className="sub">Included in every build — this is your foundation.</span></div>
                 <div className="base-row">
-                  <span className="tick">✓</span>
+                  <span className="tick"><Check size={13} strokeWidth={3} /></span>
                   <div><div className="b-label">{BASE_PLATFORM.label}</div><div className="b-note">{BASE_PLATFORM.note}</div></div>
                 </div>
                 <div className="included">
@@ -503,9 +645,9 @@ export default function App() {
             </FlowRow>
 
             {/* 02 team */}
-            <FlowRow n="02" done={teamDone} variant="left">
+            <FlowRow variant="left">
               <section className="panel">
-                <div className="section-head"><h2>Your team</h2><span className="sub">Add extra users and admins beyond what's included.</span></div>
+                <div className="section-head"><h2><Users size={18} /> Your team</h2><span className="sub">Add extra users and admins beyond what's included.</span></div>
                 <div className="qty-list">
                   {team.map((q) => <QtyRow key={q.id} q={q} count={state[q.id]} onChange={(v) => setQty(q.id, v)} />)}
                 </div>
@@ -513,9 +655,9 @@ export default function App() {
             </FlowRow>
 
             {/* 03 channels */}
-            <FlowRow n="03" done={channelsDone} variant="right">
+            <FlowRow variant="right">
               <section className="panel">
-                <div className="section-head"><h2>Channels & reports</h2><span className="sub">Each one bundles its own analytics report.</span></div>
+                <div className="section-head"><h2><Megaphone size={18} /> Channels & reports</h2><span className="sub">Each one bundles its own analytics report.</span></div>
                 <div className="qty-list">
                   {channels.map((q) => <QtyRow key={q.id} q={q} count={state[q.id]} onChange={(v) => setQty(q.id, v)} />)}
                 </div>
@@ -523,9 +665,9 @@ export default function App() {
             </FlowRow>
 
             {/* 04 leads */}
-            <FlowRow n="04" done={leadsDone} variant="zoom">
+            <FlowRow variant="zoom">
               <section className="panel">
-                <div className="section-head"><h2>Lead storage</h2><span className="sub">How many leads should your CRM hold?</span></div>
+                <div className="section-head"><h2><Database size={18} /> Lead storage</h2><span className="sub">How many leads should your CRM hold?</span></div>
                 <div className={"meter" + (leadsDone ? " on" : "")}>
                   <div>
                     <div className="mt-label">{LEADS.label}<InfoTip text={LEADS.info} /></div>
@@ -540,9 +682,9 @@ export default function App() {
             </FlowRow>
 
             {/* 05 automations + call meter */}
-            <FlowRow n="05" done={addonsDone} variant="flip">
+            <FlowRow variant="flip">
               <section className="panel">
-                <div className="section-head"><h2>Automations & add-ons</h2><span className="sub">Toggle any of these on. Everything else stays off — and free.</span></div>
+                <div className="section-head"><h2><Zap size={18} /> Automations & add-ons</h2><span className="sub">Toggle any of these on. Everything else stays off — and free.</span></div>
                 <div className="modules">
                   {MODULES.map((m) => {
                     const on = !!state.modules[m.id];
@@ -550,7 +692,7 @@ export default function App() {
                       <div key={m.id} className={"mod" + (on ? " on" : "")} role="checkbox" aria-checked={on} tabIndex={0}
                         onClick={() => toggleModule(m.id)}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleModule(m.id); } }}>
-                        <span className="box">{on ? "✓" : ""}</span>
+                        <span className="box">{on && <Check size={14} strokeWidth={3} />}</span>
                         <div><div className="m-label">{m.label}<InfoTip text={m.info} /></div><div className="m-desc">{m.desc}</div></div>
                         <div className="m-price">+{formatINR(m.price)}</div>
                       </div>
@@ -574,62 +716,6 @@ export default function App() {
               </section>
             </FlowRow>
           </div>
-
-          {/* live summary */}
-          <aside ref={summaryRef} className={"col-summary reveal reveal-right" + (summaryInView ? " in-view" : "")}>
-            <div className="summary" id="summary-card">
-              <div className="s-top">
-                <div className="period-toggle" role="tablist" aria-label="Billing period">
-                  {BILLING_PERIODS.map((p) => (
-                    <button
-                      key={p.id} type="button" role="tab" aria-selected={period.id === p.id}
-                      className={"period-btn" + (period.id === p.id ? " active" : "")}
-                      onClick={() => setPeriod(p)}
-                    >{p.label}</button>
-                  ))}
-                </div>
-                <div className="s-eye">Your {period.label} price</div>
-                <div className="s-price-wrap">
-                  {billing.hasDiscount && (
-                    <div className="s-price-meta">
-                      <span className="s-price-strike mono">{formatINR(billing.original)}</span>
-                      <span className="s-discount-badge">{billing.discountPct}% OFF</span>
-                    </div>
-                  )}
-                  <div className="s-price mono" key={`${bump}-${period.id}`}>
-                    {formatINR(displayPrice)}<span className="per">/ {period.unit}</span>
-                    {delta !== 0 && (
-                      <span className="delta-chip">{delta > 0 ? "+" : "−"}{formatINR(Math.abs(deltaForPeriod))}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="s-sub">Incl. GST · cancel anytime</div>
-                <div className="s-permo">{formatINR(totals.displayTotal)} / month</div>
-              </div>
-              <div className="receipt">
-                {totals.lines.map((l) => (
-                  <div className="r-line" key={l.id}>
-                    <span className="r-lab">{l.label}{l.kind === "qty" ? ` ×${l.qty}` : ""}</span>
-                    <span className="r-amt">{formatINR(l.amount)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="totals">
-                <div className="t-line grand">
-                  <span>Total / {period.unit} (incl. GST)</span>
-                  <span className="mono">
-                    {billing.hasDiscount && <s className="t-strike">{formatINR(billing.original)}</s>}
-                    {formatINR(billing.discounted)}
-                  </span>
-                </div>
-                {totals.minApplied && <div className="floor-note">Minimum monthly plan</div>}
-              </div>
-              <div className="s-actions">
-                <button className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}><span>Book a free demo</span><span className="btn-arrow">→</span></button>
-                <p className="s-note">No card required. We'll set up this exact configuration for you.</p>
-              </div>
-            </div>
-          </aside>
         </div>
       </main>
 

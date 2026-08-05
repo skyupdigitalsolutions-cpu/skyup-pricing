@@ -28,10 +28,17 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* several reveal-on-scroll variants use 3D transforms (rotateX + perspective) before
+   they've animated in — those can paint slightly outside their layout box and would
+   otherwise open an unwanted horizontal scrollbar on narrow screens. overflow-x: clip
+   (not hidden) on purpose — "hidden" forces the paired overflow-y to compute as "auto",
+   which turns html/body into extra scroll containers and breaks position: sticky's
+   "nearest scrolling ancestor" lookup for the summary card. clip has no such side effect. */
+html { -webkit-text-size-adjust: 100%; overflow-x: clip; }
 
 body {
   margin: 0;
+  overflow-x: clip;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   color: var(--ink);
   background:
@@ -119,14 +126,21 @@ body::before {
 }
 
 /* ---------- Layout ---------- */
-.builder { display: grid; grid-template-columns: 1fr; gap: clamp(14px, 3vw, 22px); padding-bottom: 120px; }
+.builder { display: flex; flex-direction: column; gap: clamp(14px, 3vw, 22px); padding-bottom: 120px; }
 @media (min-width: 900px) {
-  /* align-items intentionally left at its default (stretch): .col-summary must
-     span the full row height so its sticky child has room to travel as the
-     (much taller) config column scrolls. With align-items: start the summary
-     column was only ever as tall as the card itself, which gave position:
-     sticky nowhere to go — it looked "stuck" then scrolled away immediately. */
-  .builder { grid-template-columns: minmax(0, 1fr) 372px; padding-bottom: 96px; }
+  /* .summary is first in the DOM (so it has the whole tall .builder as its
+     sticky containing block — see the comment in App.jsx) but visually belongs
+     on the right; explicit grid placement restores that regardless of source order. */
+  .builder { display: grid; grid-template-columns: minmax(0, 1fr) 372px; padding-bottom: 96px; }
+  /* grid-row is explicit too — .summary comes first in the DOM, so without this the
+     sparse auto-placement cursor advances past row 1 before placing .col-config,
+     pushing it onto its own row 2 and leaving a tall empty gap beside the summary card. */
+  .col-config { grid-column: 1; grid-row: 1; }
+  /* align-self: start (overriding the grid's default row-stretch) keeps the card at
+     its own natural compact height instead of stretching to match the taller config
+     column — sticky's containing block is the grid CONTAINER, not this cell, so it
+     still has the full row's height to travel through without needing to be stretched. */
+  .summary { grid-column: 2; grid-row: 1; align-self: start; }
 }
 
 /* ---------- reveal-on-scroll (used by FlowRow, summary, footer) ----------
@@ -146,27 +160,9 @@ body::before {
 .reveal-zoom { transform: scale(.9); }
 .reveal-flip { transform: perspective(900px) rotateX(16deg) translateY(14px); transform-origin: top center; }
 
-/* ---------- Build rail (signature element) ---------- */
+/* ---------- Build rail ---------- */
 .flow { display: flex; flex-direction: column; }
-.flow-row { display: flex; gap: clamp(8px, 2vw, 16px); align-items: flex-start; }
 .flow-row + .flow-row { margin-top: clamp(14px, 3vw, 22px); }
-.flow-node { flex: 0 0 30px; display: flex; justify-content: center; }
-@media (min-width: 560px) { .flow-node { flex-basis: 36px; } }
-.flow-dot {
-  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; z-index: 1;
-  border: 1.5px solid var(--line-2); background: var(--card);
-  display: grid; place-items: center; font-family: "IBM Plex Mono", monospace;
-  font-size: 12px; font-weight: 600; color: var(--muted);
-  box-shadow: var(--shadow-sm); transition: background .25s ease, border-color .25s ease, color .25s ease, box-shadow .25s ease, transform .3s cubic-bezier(.34,1.56,.64,1);
-}
-@media (min-width: 560px) { .flow-dot { width: 36px; height: 36px; font-size: 13px; } }
-.flow-dot.done { background: linear-gradient(135deg, var(--vivid), var(--accent)); border-color: transparent; color: #fff; box-shadow: 0 4px 14px rgba(124,92,255,.4); transform: scale(1.06); animation: dot-pop .45s cubic-bezier(.34,1.56,.64,1); }
-@keyframes dot-pop {
-  0% { transform: scale(.7); }
-  60% { transform: scale(1.22); }
-  100% { transform: scale(1.06); }
-}
-.flow-row .panel { flex: 1; min-width: 0; }
 
 /* ---------- Cards / sections ---------- */
 .panel {
@@ -178,7 +174,11 @@ body::before {
 .panel:hover { transform: translateY(-3px); border-color: var(--line-2); box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.6); }
 
 .section-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
-.section-head h2 { font-family: "Space Grotesk", sans-serif; font-size: clamp(17px, 4.4vw, 21px); margin: 0; letter-spacing: -.01em; }
+.section-head h2 {
+  font-family: "Space Grotesk", sans-serif; font-size: clamp(17px, 4.4vw, 21px); margin: 0; letter-spacing: -.01em;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-head h2 svg { color: var(--accent); flex-shrink: 0; }
 .section-head .sub { color: var(--muted); font-size: 13px; width: 100%; margin-top: 2px; }
 
 /* base row */
@@ -244,7 +244,8 @@ body::before {
   padding: 12px 0; border-bottom: 1px solid var(--line);
 }
 .qty:last-child { border-bottom: 0; padding-bottom: 0; }
-.qty .q-label { font-weight: 600; font-size: 15px; }
+.qty .q-label { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 7px; }
+.q-icon { flex-shrink: 0; }
 .qty .q-help { color: var(--muted); font-size: 12.5px; margin-top: 1px; }
 .qty .q-price { grid-column: 1 / 2; font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent-2); }
 .stepper {
@@ -324,7 +325,7 @@ body::before {
 
 /* summary */
 .summary {
-  position: sticky; top: 18px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  position: sticky; top: 18px; z-index: 5; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: var(--shadow-lg); overflow: hidden; display: flex; flex-direction: column;
 }
 .summary .s-top { background: linear-gradient(160deg, #0d1330, #1a2260 55%, #241a5c); color: #fff; padding: 22px 20px; position: relative; overflow: hidden; }
@@ -346,7 +347,7 @@ body::before {
 .s-price-meta { display: flex; align-items: center; gap: 8px; margin-top: 10px; position: relative; }
 .s-price-strike { font-size: 14px; color: rgba(255,255,255,.55); text-decoration: line-through; }
 .s-discount-badge {
-  display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; letter-spacing: .01em;
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; letter-spacing: .01em;
   background: linear-gradient(135deg, var(--good), #0ea371); color: #fff; padding: 3px 9px; border-radius: 999px;
   animation: badge-pop .5s cubic-bezier(.34,1.56,.64,1);
 }
@@ -367,7 +368,7 @@ body::before {
 .summary .s-permo { opacity: .65; font-size: 11px; margin-top: 3px; position: relative; }
 
 .delta-chip {
-  display: inline-flex; align-self: center; font-family: "IBM Plex Mono", monospace; font-size: 12.5px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 3px; align-self: center; font-family: "IBM Plex Mono", monospace; font-size: 12.5px; font-weight: 600;
   padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff;
   animation: deltaFade 1.5s ease forwards;
 }
@@ -385,7 +386,10 @@ body::before {
 
 .totals { border-top: 1px dashed var(--line-2); padding: 12px 18px; }
 .totals .t-line { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; color: var(--muted); }
-.totals .t-line.grand { color: var(--ink); font-weight: 700; font-size: 18px; padding-top: 8px; margin-top: 4px; border-top: 1px solid var(--line); }
+.totals .t-line.grand {
+  color: var(--ink); font-weight: 700; font-size: 18px; padding-top: 8px; margin-top: 4px; border-top: 1px solid var(--line);
+  flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 3px;
+}
 .totals .t-line .mono { font-size: 14px; }
 .t-strike { font-size: 11.5px; font-weight: 400; color: var(--muted); margin-right: 6px; }
 
@@ -566,20 +570,15 @@ body::before {
 }
 
 @media (max-width: 899px){
-  .summary { position: static; }
-  /* on mobile the whole page scrolls, so don't trap scrolling inside a
-     fixed-height receipt box — let it grow naturally with its content */
-  .summary .receipt { max-height: none; overflow: visible; }
+  .summary { top: 12px; }
 }
 
 /* keep the sticky card's header + Book-a-demo reachable even when the card is
    taller than the viewport: cap the card to the viewport height and let only
    the receipt (the part that can grow long) scroll internally. */
-@media (min-width: 900px) {
-  .summary { max-height: calc(100vh - 36px); }
-  .summary .s-top, .summary .totals, .summary .s-actions { flex: 0 0 auto; }
-  .summary .receipt { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
-}
+.summary { max-height: calc(100vh - 24px); }
+.summary .s-top, .summary .totals, .summary .s-actions { flex: 0 0 auto; }
+.summary .receipt { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
 
 
 /* minimum-monthly-plan note */
@@ -587,7 +586,7 @@ body::before {
   margin-top: 6px; font-size: 11.5px; color: var(--accent-2); font-weight: 600;
   display: flex; align-items: center; gap: 5px;
 }
-.floor-note::before { content: "i"; display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--accent-soft); font-size: 10px; font-style: italic; }
+.floor-note svg { flex-shrink: 0; }
 .quote-note { margin-top: 4px; font-size: 11.5px; color: var(--accent-2); font-weight: 600; }
 
 /* modal */
@@ -616,6 +615,5 @@ body::before {
 .btn, .stepper button, .mod, .modal-close { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
-  .flow-dot.done { transform: none; }
   .seg.on, .mod.on { transform: none; }
 }
