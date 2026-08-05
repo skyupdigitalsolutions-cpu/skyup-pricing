@@ -569,16 +569,20 @@ body::before {
   .cta-banner-actions { flex-direction: column; }
 }
 
-@media (max-width: 899px){
-  .summary { top: 12px; }
-}
-
 /* keep the sticky card's header + Book-a-demo reachable even when the card is
    taller than the viewport: cap the card to the viewport height and let only
    the receipt (the part that can grow long) scroll internally. */
 .summary { max-height: calc(100vh - 24px); }
 .summary .s-top, .summary .totals, .summary .s-actions { flex: 0 0 auto; }
 .summary .receipt { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
+
+@media (max-width: 899px){
+  /* mobile scrolls the summary card normally along with the rest of the page —
+     no pinning, and no need to cap its height / trap the receipt in an internal
+     scroll box, since it's not staying on screen for an extended scroll anymore */
+  .summary { position: static; max-height: none; }
+  .summary .receipt { flex: 0 1 auto; max-height: none; overflow: visible; }
+}
 
 
 /* minimum-monthly-plan note */
