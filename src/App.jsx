@@ -413,7 +413,7 @@ const FEATURES = [
 export default function App() {
   const [state, setState] = useState({ ...DEFAULT_STATE, modules: { ...DEFAULT_STATE.modules } });
   const [showDemo, setShowDemo] = useState(false);
-  const [period, setPeriod] = useState(BILLING_PERIODS[1]); // default: 6-month
+  const [period, setPeriod] = useState(BILLING_PERIODS[0]); // default: monthly
   const totals = useMemo(() => computeTotals(state, period.basePrice), [state, period]);
   // tracked at the default base price so switching periods never itself looks
   // like a builder-driven price change to useValueBump below
@@ -721,6 +721,18 @@ export default function App() {
       <footer ref={footRef} className={"site-foot reveal reveal-up" + (footInView ? " in-view" : "")}>
         <div className="wrap">Built by {CONTACT.brand} · <a href={`https://${CONTACT.site}`} target="_blank" rel="noreferrer">{CONTACT.site}</a></div>
       </footer>
+
+      {/* phone-only persistent price bar — hidden on tablet/laptop/desktop (see CSS),
+          since the full summary card is already always visible there via position: sticky */}
+      <div className="mobile-price-bar">
+        <div className="mpb-info">
+          <div className="mpb-label">Total / {period.unit} (incl. GST)</div>
+          <div className="mpb-price mono">{formatINR(billing.discounted)}</div>
+        </div>
+        <button className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}>
+          <span>Book a free demo</span><span className="btn-arrow"><ArrowRight size={16} /></span>
+        </button>
+      </div>
 
       {showDemo && <DemoModal totals={totals} state={state} onClose={() => setShowDemo(false)} onSubmitted={handleDemoSubmitted} />}
     </>
