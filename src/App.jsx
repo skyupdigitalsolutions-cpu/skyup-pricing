@@ -561,69 +561,6 @@ export default function App() {
 
       <main className="wrap" ref={builderRef}>
         <div className="builder">
-          {/* live summary — placed first in the DOM (not just visually) so position: sticky
-              has the whole tall .builder as its containing block and can stay pinned to the
-              top of the screen while the config panels below it scroll; desktop restores the
-              config-left/summary-right look via explicit grid-column placement in CSS. */}
-          <aside
-            ref={summaryRef} id="summary-card"
-            className={"summary reveal reveal-right" + (summaryInView ? " in-view" : "")}
-          >
-            <div className="s-top">
-              <div className="period-toggle" role="tablist" aria-label="Billing period">
-                {BILLING_PERIODS.map((p) => (
-                  <button
-                    key={p.id} type="button" role="tab" aria-selected={period.id === p.id}
-                    className={"period-btn" + (period.id === p.id ? " active" : "")}
-                    onClick={() => setPeriod(p)}
-                  >{p.label}</button>
-                ))}
-              </div>
-              <div className="s-eye">Your {period.label} price</div>
-              <div className="s-price-wrap">
-                {billing.hasDiscount && (
-                  <div className="s-price-meta">
-                    <span className="s-price-strike mono">{formatINR(billing.original)}</span>
-                    <span className="s-discount-badge"><BadgePercent size={13} /> {billing.discountPct}% OFF</span>
-                  </div>
-                )}
-                <div className="s-price mono" key={`${bump}-${period.id}`}>
-                  {formatINR(displayPrice)}<span className="per">/ {period.unit}</span>
-                  {deltaForPeriod !== 0 && (
-                    <span className="delta-chip">
-                      {deltaForPeriod > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                      {formatINR(Math.abs(deltaForPeriod))}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="s-sub">Incl. GST · cancel anytime</div>
-              <div className="s-permo">{formatINR(totals.displayTotal)} / month</div>
-            </div>
-            <div className="receipt">
-              {totals.lines.map((l) => (
-                <div className="r-line" key={l.id}>
-                  <span className="r-lab">{l.label}{l.kind === "qty" ? ` ×${l.qty}` : ""}</span>
-                  <span className="r-amt">{formatINR(l.amount)}</span>
-                </div>
-              ))}
-            </div>
-            <div className="totals">
-              <div className="t-line grand">
-                <span>Total / {period.unit} (incl. GST)</span>
-                <span className="mono">
-                  {billing.hasDiscount && <s className="t-strike">{formatINR(billing.original)}</s>}
-                  {formatINR(billing.discounted)}
-                </span>
-              </div>
-              {totals.minApplied && <div className="floor-note"><Info size={12} /> Minimum monthly plan</div>}
-            </div>
-            <div className="s-actions">
-              <button className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}><span>Book a free demo</span><span className="btn-arrow"><ArrowRight size={16} /></span></button>
-              <p className="s-note">No card required. We'll set up this exact configuration for you.</p>
-            </div>
-          </aside>
-
           <div className="col-config flow">
             {/* 01 core */}
             <FlowRow variant="up">
@@ -716,6 +653,68 @@ export default function App() {
               </section>
             </FlowRow>
           </div>
+
+          {/* live summary — visually placed on the right via explicit grid-column
+              placement in CSS (desktop), regardless of this DOM position; on mobile
+              it naturally renders here, after all the config panels. */}
+          <aside
+            ref={summaryRef} id="summary-card"
+            className={"summary reveal reveal-right" + (summaryInView ? " in-view" : "")}
+          >
+            <div className="s-top">
+              <div className="period-toggle" role="tablist" aria-label="Billing period">
+                {BILLING_PERIODS.map((p) => (
+                  <button
+                    key={p.id} type="button" role="tab" aria-selected={period.id === p.id}
+                    className={"period-btn" + (period.id === p.id ? " active" : "")}
+                    onClick={() => setPeriod(p)}
+                  >{p.label}</button>
+                ))}
+              </div>
+              <div className="s-eye">Your {period.label} price</div>
+              <div className="s-price-wrap">
+                {billing.hasDiscount && (
+                  <div className="s-price-meta">
+                    <span className="s-price-strike mono">{formatINR(billing.original)}</span>
+                    <span className="s-discount-badge"><BadgePercent size={13} /> {billing.discountPct}% OFF</span>
+                  </div>
+                )}
+                <div className="s-price mono" key={`${bump}-${period.id}`}>
+                  {formatINR(displayPrice)}<span className="per">/ {period.unit}</span>
+                  {deltaForPeriod !== 0 && (
+                    <span className="delta-chip">
+                      {deltaForPeriod > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                      {formatINR(Math.abs(deltaForPeriod))}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="s-sub">Incl. GST · cancel anytime</div>
+              <div className="s-permo">{formatINR(totals.displayTotal)} / month</div>
+            </div>
+            <div className="receipt">
+              {totals.lines.map((l) => (
+                <div className="r-line" key={l.id}>
+                  <span className="r-lab">{l.label}{l.kind === "qty" ? ` ×${l.qty}` : ""}</span>
+                  <span className="r-amt">{formatINR(l.amount)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="totals">
+              <div className="t-line grand">
+                <span>Total / {period.unit} (incl. GST)</span>
+                <span className="mono">
+                  {billing.hasDiscount && <s className="t-strike">{formatINR(billing.original)}</s>}
+                  {formatINR(billing.discounted)}
+                </span>
+              </div>
+              {totals.minApplied && <div className="floor-note"><Info size={12} /> Minimum monthly plan</div>}
+            </div>
+            <div className="s-actions">
+              <button className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}><span>Book a free demo</span><span className="btn-arrow"><ArrowRight size={16} /></span></button>
+              <p className="s-note">No card required. We'll set up this exact configuration for you.</p>
+            </div>
+          </aside>
         </div>
       </main>
 

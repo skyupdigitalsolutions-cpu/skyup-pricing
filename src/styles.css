@@ -128,13 +128,12 @@ body::before {
 /* ---------- Layout ---------- */
 .builder { display: flex; flex-direction: column; gap: clamp(14px, 3vw, 22px); padding-bottom: 120px; }
 @media (min-width: 900px) {
-  /* .summary is first in the DOM (so it has the whole tall .builder as its
-     sticky containing block — see the comment in App.jsx) but visually belongs
-     on the right; explicit grid placement restores that regardless of source order. */
+  /* .summary sits after .col-config in the DOM (so mobile renders it at the end,
+     below all the panels) but visually belongs on the right on desktop; explicit
+     grid placement puts it there regardless of source order. grid-row is pinned
+     on both, too — without it the auto-placement cursor can push one of them onto
+     its own row, leaving a tall empty gap beside the other. */
   .builder { display: grid; grid-template-columns: minmax(0, 1fr) 372px; padding-bottom: 96px; }
-  /* grid-row is explicit too — .summary comes first in the DOM, so without this the
-     sparse auto-placement cursor advances past row 1 before placing .col-config,
-     pushing it onto its own row 2 and leaving a tall empty gap beside the summary card. */
   .col-config { grid-column: 1; grid-row: 1; }
   /* align-self: start (overriding the grid's default row-stretch) keeps the card at
      its own natural compact height instead of stretching to match the taller config
