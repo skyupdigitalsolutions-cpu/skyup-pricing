@@ -407,7 +407,7 @@ const FEATURES = [
   { icon: "bell", title: "Smart Follow-Up Management", desc: "Schedule calls, meetings and reminders so your team knows exactly which lead to contact next." },
   { icon: "link", title: "Meta, Google and Website Integration", desc: "Bring enquiries from your advertising campaigns and websites directly into the CRM." },
   { icon: "team", title: "Sales-Team Tracking", desc: "Monitor assigned leads, pending activities, attendance, daily reports and team performance." },
-  { icon: "spark", title: "AI Summaries and Suggestions", desc: "AI can review available lead remarks, calls and interactions to provide:", bullets: AI_SUGGESTIONS },
+  { icon: "spark", title: "AI Summaries and Suggestions", desc: "AI can review available lead remarks, calls and interactions to provide:", bullets: AI_SUGGESTIONS, highlight: true },
 ];
 
 export default function App() {
@@ -475,6 +475,22 @@ export default function App() {
     builderRef.current?.scrollIntoView({ behavior: REDUCE_MOTION ? "auto" : "smooth", block: "start" });
   }, []);
 
+  // phone price bar stays hidden over the hero/marketing sections and only
+  // appears once the builder ("Start with the core" onward) reaches the viewport
+  const [showMobileBar, setShowMobileBar] = useState(false);
+  useEffect(() => {
+    const el = builderRef.current;
+    if (!el) return;
+    const onScroll = () => setShowMobileBar(window.scrollY >= el.offsetTop - 80);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
   return (
     <>
       <header className="site-head">
@@ -527,7 +543,7 @@ export default function App() {
           </Reveal>
           <div className="feat-grid">
             {FEATURES.map((f, i) => (
-              <Reveal key={f.title} variant="up" className={"feat-card" + (f.bullets ? " feat-card-wide" : "")} delay={i * 80}>
+              <Reveal key={f.title} variant="up" className={"feat-card" + (f.bullets ? " feat-card-wide" : "") + (f.highlight ? " feat-card-highlight" : "")} delay={i * 80}>
                 <FeatIcon name={f.icon} />
                 <h3 className="feat-title">{f.title}</h3>
                 <p className="feat-desc">{f.desc}</p>
@@ -541,20 +557,6 @@ export default function App() {
           </div>
           <Reveal variant="up" className="section-cta">
             <button type="button" className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}><span>See the CRM in Action</span><span className="btn-arrow"><ArrowRight size={16} /></span></button>
-          </Reveal>
-        </div>
-      </section>
-
-      <section className="final-cta">
-        <div className="wrap">
-          <Reveal variant="up" className="cta-banner">
-            <h2 className="sec-h2">Manage Leads Better. Follow Up Faster. Sell Smarter.</h2>
-            <p>Bring your enquiries, advertising data, sales activities and AI-powered insights into one CRM.</p>
-            <div className="cta-banner-actions">
-              <button type="button" className="btn btn-primary btn-cta btn-standout" onClick={scrollToBuilder}><span>Customise My CRM & See the Price</span><span className="btn-arrow"><ArrowRight size={16} /></span></button>
-              <button type="button" className="btn btn-ghost-dark" onClick={() => setShowDemo(true)}>Book a Free CRM Demo</button>
-            </div>
-            <p className="cta-tag">For businesses across Bengaluru.</p>
           </Reveal>
         </div>
       </section>
@@ -668,7 +670,10 @@ export default function App() {
                     key={p.id} type="button" role="tab" aria-selected={period.id === p.id}
                     className={"period-btn" + (period.id === p.id ? " active" : "")}
                     onClick={() => setPeriod(p)}
-                  >{p.label}</button>
+                  >
+                    {p.label}
+                    {p.discountPct > 0 && <span className="period-badge">{p.discountPct}% off</span>}
+                  </button>
                 ))}
               </div>
               <div className="s-eye">Your {period.label} price</div>
@@ -723,16 +728,20 @@ export default function App() {
       </footer>
 
       {/* phone-only persistent price bar — hidden on tablet/laptop/desktop (see CSS),
-          since the full summary card is already always visible there via position: sticky */}
-      <div className="mobile-price-bar">
-        <div className="mpb-info">
-          <div className="mpb-label">Total / {period.unit} (incl. GST)</div>
-          <div className="mpb-price mono">{formatINR(billing.discounted)}</div>
+          since the full summary card is already always visible there via position: sticky.
+          Also hidden until the builder section scrolls into view, so it doesn't cover
+          the hero's own CTAs before the user has configured anything. */}
+      {showMobileBar && (
+        <div className="mobile-price-bar">
+          <div className="mpb-info">
+            <div className="mpb-label">Total / {period.unit} (incl. GST)</div>
+            <div className="mpb-price mono">{formatINR(billing.discounted)}</div>
+          </div>
+          <button className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}>
+            <span>Book a free demo</span><span className="btn-arrow"><ArrowRight size={16} /></span>
+          </button>
         </div>
-        <button className="btn btn-primary btn-cta" onClick={() => setShowDemo(true)}>
-          <span>Book a free demo</span><span className="btn-arrow"><ArrowRight size={16} /></span>
-        </button>
-      </div>
+      )}
 
       {showDemo && <DemoModal totals={totals} state={state} onClose={() => setShowDemo(false)} onSubmitted={handleDemoSubmitted} />}
     </>
