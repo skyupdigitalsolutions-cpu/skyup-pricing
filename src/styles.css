@@ -88,7 +88,7 @@ body::before {
 .brand .name b { color: var(--accent-2); }
 
 /* ---------- Hero ---------- */
-.hero { padding: clamp(10px, 2vw, 22px) 0 clamp(20px, 4vw, 38px); }
+.hero { padding: clamp(10px, 2vw, 22px) 0 clamp(20px, 4vw, 38px); overflow: clip; }
 .hero-grid { display: grid; grid-template-columns: 1fr; gap: clamp(20px, 4vw, 28px); align-items: center; }
 
 .eyebrow {
@@ -123,6 +123,73 @@ body::before {
 @keyframes hero-up {
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: none; }
+}
+
+/* decorative dashboard preview that fills the empty right-hand side of the
+   hero on desktop — hidden on mobile/tablet, where there's no room for it
+   beside the copy without pushing the CTAs below the fold */
+.hero-mock { display: none; }
+@media (min-width: 980px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: clamp(24px, 4vw, 48px); }
+  .hero-mock {
+    display: block; position: relative;
+    animation: hero-up .8s cubic-bezier(.22,1,.36,1) .3s both;
+  }
+}
+.hmock-card {
+  position: relative; background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 18px;
+  transform: rotate(1.2deg);
+}
+.hmock-card::before {
+  content: ""; position: absolute; inset: -30% -30% auto auto; width: 220px; height: 220px; z-index: -1;
+  background: radial-gradient(circle, rgba(124,92,255,.22), transparent 70%);
+}
+.hmock-top {
+  display: flex; align-items: center; gap: 7px;
+  font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600;
+  color: var(--ink); letter-spacing: .01em;
+}
+.hmock-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(16,185,129,.55); animation: hmock-pulse 2s ease-out infinite;
+}
+@keyframes hmock-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16,185,129,.5); }
+  70% { box-shadow: 0 0 0 6px rgba(16,185,129,0); }
+  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+}
+.hmock-range { margin-left: auto; color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+.hmock-stats { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hmock-stat { display: flex; align-items: center; gap: 8px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 10px; }
+.hmock-stat-icon {
+  width: 24px; height: 24px; flex: 0 0 24px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-2);
+}
+.hmock-stat-icon-vivid { background: var(--vivid-soft); color: var(--vivid); }
+.hmock-stat-icon-good { background: var(--good-soft); color: var(--good); }
+.hmock-stat-num { font-family: "IBM Plex Mono", monospace; font-weight: 700; font-size: 15px; line-height: 1.15; color: var(--ink); }
+.hmock-stat-label { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.hmock-chart { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px 6px; }
+.hmock-chart-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); font-weight: 600; }
+.hmock-chart-trend { display: inline-flex; align-items: center; gap: 3px; color: var(--good); font-weight: 700; }
+.hmock-spark { display: block; width: 100%; height: 46px; margin-top: 4px; }
+.hmock-badge {
+  position: absolute; display: flex; align-items: center; gap: 6px;
+  background: #fff; border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 12px; font-size: 12px; font-weight: 600; color: var(--ink);
+  box-shadow: var(--shadow); animation: hmock-float 5s ease-in-out infinite;
+}
+.hmock-badge svg { color: var(--good); flex-shrink: 0; }
+.hmock-badge-1 { top: -14px; left: -18px; animation-delay: .2s; }
+.hmock-badge-2 { bottom: -14px; right: -14px; animation-delay: 1.1s; }
+.hmock-badge-2 svg { color: var(--accent); }
+@keyframes hmock-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hmock-dot, .hmock-badge { animation: none; }
 }
 
 /* ---------- Layout ---------- */

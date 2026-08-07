@@ -6,6 +6,7 @@ import {
 } from "./pricing.config.js";
 import { saveLead, API_BASE } from "./config/api.js";
 import logoUrl from "./assets/rbd-logo.webp";
+import Testimonials from "./components/Testimonials.jsx";
 import {
   Check, X, Plus, Minus, Info, ArrowRight, Sparkles, LayoutGrid, Users, Megaphone,
   Database, Zap, BadgePercent, TrendingUp, TrendingDown, MessageCircle, Send, Filter, Bell, Link2,
@@ -517,6 +518,46 @@ export default function App() {
             </div>
             <p className="hero-note">Plans are recommended based on your users, lead volume, integrations and business requirements.</p>
           </div>
+
+          <div className="hero-mock" aria-hidden="true">
+            <div className="hmock-card">
+              <div className="hmock-top">
+                <span className="hmock-dot" />
+                <span>Live Dashboard</span>
+                <span className="hmock-range">This week</span>
+              </div>
+              <div className="hmock-stats">
+                <div className="hmock-stat">
+                  <span className="hmock-stat-icon"><Users size={13} /></span>
+                  <div><div className="hmock-stat-num">695</div><div className="hmock-stat-label">Total Leads</div></div>
+                </div>
+                <div className="hmock-stat">
+                  <span className="hmock-stat-icon hmock-stat-icon-vivid"><BadgePercent size={13} /></span>
+                  <div><div className="hmock-stat-num">229</div><div className="hmock-stat-label">Hot Leads</div></div>
+                </div>
+                <div className="hmock-stat">
+                  <span className="hmock-stat-icon hmock-stat-icon-good"><TrendingUp size={13} /></span>
+                  <div><div className="hmock-stat-num">38</div><div className="hmock-stat-label">Conversions</div></div>
+                </div>
+                <div className="hmock-stat">
+                  <span className="hmock-stat-icon"><Bell size={13} /></span>
+                  <div><div className="hmock-stat-num">13</div><div className="hmock-stat-label">Follow-ups</div></div>
+                </div>
+              </div>
+              <div className="hmock-chart">
+                <div className="hmock-chart-head">
+                  <span>Leads over time</span>
+                  <span className="hmock-chart-trend"><TrendingUp size={11} /> +18%</span>
+                </div>
+                <svg viewBox="0 0 220 56" className="hmock-spark" preserveAspectRatio="none">
+                  <path d="M0,44 L28,40 L56,46 L84,26 L112,32 L140,14 L168,20 L196,8 L220,12" fill="none" stroke="#3a5bff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M0,44 L28,40 L56,46 L84,26 L112,32 L140,14 L168,20 L196,8 L220,12 L220,56 L0,56 Z" fill="#3a5bff" opacity=".08" />
+                </svg>
+              </div>
+            </div>
+            <div className="hmock-badge hmock-badge-1"><Check size={12} /> Lead converted</div>
+            <div className="hmock-badge hmock-badge-2"><MessageCircle size={12} /> New enquiry</div>
+          </div>
         </div>
       </section>
 
@@ -560,6 +601,8 @@ export default function App() {
           </Reveal>
         </div>
       </section>
+
+      <Testimonials />
 
       <main className="wrap" ref={builderRef}>
         <div className="builder">
