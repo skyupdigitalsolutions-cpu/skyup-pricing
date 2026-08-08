@@ -10,7 +10,7 @@ import Testimonials from "./components/Testimonials.jsx";
 import {
   Check, X, Plus, Minus, Info, ArrowRight, Sparkles, LayoutGrid, Users, Megaphone,
   Database, Zap, BadgePercent, TrendingUp, TrendingDown, MessageCircle, Send, Filter, Bell, Link2,
-  Globe, ShieldCheck,
+  Globe, ShieldCheck, MoreVertical,
 } from "lucide-react";
 import { SiMeta, SiGoogleads } from "react-icons/si";
 
@@ -221,7 +221,7 @@ function InfoTip({ text }) {
 
 /* ---------- book-a-demo modal ---------- */
 function DemoModal({ totals, state, onClose, onSubmitted }) {
-  const [form, setForm] = useState({ name: "", phone: "", email: "" });
+  const [form, setForm] = useState({ name: "", company: "", phone: "", email: "" });
   const [status, setStatus] = useState("idle"); // idle | saving | saved | error
   const [err, setErr] = useState("");
   const savedRef = useRef(false); // save at most once per modal open
@@ -235,6 +235,7 @@ function DemoModal({ totals, state, onClose, onSubmitted }) {
     }
     parts.push(`Estimated: ${formatINR(totals.displayTotal)}/month (incl. GST)${totals.minApplied ? " — minimum monthly plan" : ""}.`);
     if (form.name) parts.push(`\nName: ${form.name}`);
+    if (form.company) parts.push(`Company: ${form.company}`);
     if (form.phone) parts.push(`Phone: ${form.phone}`);
     if (form.email) parts.push(`Email: ${form.email}`);
     return parts.join("\n");
@@ -244,6 +245,7 @@ function DemoModal({ totals, state, onClose, onSubmitted }) {
 
   const buildPayload = () => ({
     name: form.name,
+    company: form.company,
     phone: form.phone,
     email: form.email,
     pricing: {
@@ -305,6 +307,7 @@ function DemoModal({ totals, state, onClose, onSubmitted }) {
           {totals.minApplied && <div className="quote-note">Minimum monthly plan</div>}
         </div>
         <div className="field"><label htmlFor="d-name">Name</label><input id="d-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" /></div>
+        <div className="field"><label htmlFor="d-company">Company Name</label><input id="d-company" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Your company" /></div>
         <div className="field"><label htmlFor="d-phone">Phone / WhatsApp</label><input id="d-phone" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="10-digit number" /></div>
         <div className="field"><label htmlFor="d-email">Email</label><input id="d-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@company.com" /></div>
 
@@ -475,14 +478,24 @@ export default function App() {
   const scrollToBuilder = useCallback(() => {
     builderRef.current?.scrollIntoView({ behavior: REDUCE_MOTION ? "auto" : "smooth", block: "start" });
   }, []);
+  const scrollToId = useCallback((id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: REDUCE_MOTION ? "auto" : "smooth", block: "start" });
+  }, []);
+
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const goTo = (fn) => { fn(); setMobileNavOpen(false); };
 
   // phone price bar stays hidden over the hero/marketing sections and only
   // appears once the builder ("Start with the core" onward) reaches the viewport
   const [showMobileBar, setShowMobileBar] = useState(false);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
   useEffect(() => {
     const el = builderRef.current;
     if (!el) return;
-    const onScroll = () => setShowMobileBar(window.scrollY >= el.offsetTop - 80);
+    const onScroll = () => {
+      setShowMobileBar(window.scrollY >= el.offsetTop - 80);
+      setHeaderScrolled(window.scrollY > 4);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
@@ -494,15 +507,36 @@ export default function App() {
 
   return (
     <>
-      <header className="site-head">
-  <div className="wrap">
+      <header className={`site-head${headerScrolled ? " scrolled" : ""}`}>
+  <div className="wrap site-head-row">
     <div className="brand">
       <span className="brand-logo">
         <img src={logoUrl} alt="Skyup Digital Solutions" width="160" height="46" />
       </span>
       <span className="brand-badge">CRM</span>
     </div>
+    <nav className="site-nav" aria-label="Primary">
+      <button type="button" onClick={() => scrollToId("features")}>What's Inside</button>
+      <button type="button" onClick={() => scrollToId("reviews")}>Reviews</button>
+      <button type="button" onClick={scrollToBuilder}>Pricing</button>
+    </nav>
+    <button
+      type="button"
+      className="site-nav-toggle"
+      aria-label="Open menu"
+      aria-expanded={mobileNavOpen}
+      onClick={() => setMobileNavOpen((v) => !v)}
+    >
+      <MoreVertical size={22} />
+    </button>
   </div>
+  {mobileNavOpen && (
+    <nav className="site-nav-mobile" aria-label="Primary mobile">
+      <button type="button" onClick={() => goTo(() => scrollToId("features"))}>What's Inside</button>
+      <button type="button" onClick={() => goTo(() => scrollToId("reviews"))}>Reviews</button>
+      <button type="button" onClick={() => goTo(scrollToBuilder)}>Pricing</button>
+    </nav>
+  )}
 </header>
 
       <section className="hero">
@@ -511,7 +545,7 @@ export default function App() {
             <span className="eyebrow"><Sparkles size={12} /> AI-Powered CRM</span>
             <h1>AI-Powered CRM That Helps You <span className="hl">Follow Up Smarter</span> and Close More Sales</h1>
             <p className="lede">Capture every enquiry, manage your sales team and receive AI-generated summaries and follow-up suggestions — all from one CRM.</p>
-            <p className="lede">Connect leads from Meta Ads, Google Ads, websites and other sources without managing multiple applications.</p>
+            <p className="lede-highlight">Lead management + AI + integration</p>
             <div className="hero-ctas">
               <button type="button" className="btn btn-primary btn-cta btn-standout" onClick={scrollToBuilder}><span>Customise My CRM & See the Price</span><span className="btn-arrow"><ArrowRight size={16} /></span></button>
               <button type="button" className="btn btn-ghost" onClick={() => setShowDemo(true)}>Book a Free Demo</button>
@@ -576,7 +610,7 @@ export default function App() {
         </div>
       </section>
 
-      <section className="features">
+      <section className="features" id="features">
         <div className="wrap">
           <Reveal variant="up" className="features-head">
             <span className="eyebrow"><Sparkles size={12} /> What's inside</span>
@@ -604,7 +638,7 @@ export default function App() {
 
       <Testimonials />
 
-      <main className="wrap" ref={builderRef}>
+      <main className="wrap" ref={builderRef} id="pricing">
         <div className="builder">
           <div className="col-config flow">
             {/* 01 core */}

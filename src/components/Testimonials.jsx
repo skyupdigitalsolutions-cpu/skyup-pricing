@@ -4,21 +4,21 @@ import { Star, Quote, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-rea
 import "./Testimonials.css";
 
 const TESTIMONIALS = [
-  { name: "Syeed", company: "", review: "We were struggling to keep track of leads and follow-ups before using the CRM. Now everything is organized in one place, and our team never misses an inquiry. It has saved us a lot of time and improved our customer response significantly." },
+  { name: "Syeed", company: "Spotek", review: "We were struggling to keep track of leads and follow-ups before using the CRM. Now everything is organized in one place, and our team never misses an inquiry. It has saved us a lot of time and improved our customer response significantly." },
   { name: "Suhas", company: "Sarthi", review: "We needed a CRM that was simple yet powerful, and this was exactly what we were looking for. The WhatsApp integration and automated follow-ups have made our sales process much smoother. Highly recommended for growing businesses." },
-  { name: "Raymond", company: "", review: "The CRM has completely changed how we manage our customers. From lead tracking to sales updates, everything is available in real time. It's easy to use, and our productivity has improved a lot." },
-  { name: "Amith Kumar", company: "", review: "Before implementing this CRM, we were managing everything manually. Now our team has complete visibility of every lead and customer interaction. It has definitely helped us close more business with less effort." },
+  { name: "Raymond", company: "Education Consultation", review: "The CRM has completely changed how we manage our customers. From lead tracking to sales updates, everything is available in real time. It's easy to use, and our productivity has improved a lot." },
+  { name: "Amith Kumar", company: "Logistics", review: "Before implementing this CRM, we were managing everything manually. Now our team has complete visibility of every lead and customer interaction. It has definitely helped us close more business with less effort." },
   { name: "Moqsood", company: "Launcher Desk", review: "One feature I really appreciate is the automation. It reduces repetitive work and ensures every lead gets followed up on time. The dashboard is clean, fast, and makes daily operations much easier." },
   { name: "Pooja", company: "Rathana Bhoomi", review: "Managing property inquiries used to be difficult with multiple channels. This CRM brought everything together in one place, making lead management effortless. Our response time has improved, and clients appreciate the quick communication." },
   { name: "Umesha", company: "Gruhakalpa", review: "This CRM has helped us organize our sales process from start to finish. Every inquiry is properly tracked, and follow-ups happen without depending on manual reminders. It has become an important part of our daily workflow." },
-  { name: "Isiri", company: "", review: "I was looking for a solution that my entire team could use without much training. The interface is simple, and everyone adapted quickly. It has made customer management much more efficient." },
-  { name: "Kuthadra", company: "", review: "What impressed me the most was how customizable the CRM is. We could adapt it to our business process without any hassle. The support team was also very responsive whenever we needed assistance." },
+  { name: "Isiri", company: "Advocate", review: "I was looking for a solution that my entire team could use without much training. The interface is simple, and everyone adapted quickly. It has made customer management much more efficient." },
+  { name: "Kuthadra", company: "Real Estate", review: "What impressed me the most was how customizable the CRM is. We could adapt it to our business process without any hassle. The support team was also very responsive whenever we needed assistance." },
 ];
 
 const TRUST_BADGES = [
   "Better Lead Management",
   "Faster Follow-ups",
-  "WhatsApp Automation",
+  "WhatsApp Automation Available",
   "Sales Pipeline Tracking",
   "AI Powered CRM",
 ];
@@ -163,7 +163,7 @@ export default function Testimonials() {
   const reduceMotion = !!prefersReducedMotion;
 
   return (
-    <section className="tst-section">
+    <section className="tst-section" id="reviews">
       <span className="tst-blob tst-blob-1" aria-hidden="true" />
       <span className="tst-blob tst-blob-2" aria-hidden="true" />
 
